@@ -40,12 +40,16 @@ endpointConfiguration.StartTopicExchangeServer(); // Defaults the name to NServi
 - The topic exchange server only stores subscriptions in memory at the moment.
 - Does respect sender-side distribution. The server can have mutliple physical addresses for the same logical endpoint and distribute between them.
   - This includes respecting the configured distribution policy on the topic exchange server.
+- Respects the instance mapping file at startup
+  - So you can have multiple instances of the topic exchange running and each one will get a subscribe requests, and the publishes will be distributed between them.
+  - It only loads at startup so it won't respect changes without a restart.
 
 ## TODO
 
 - Testing
 - Persistent Subscriptions
 - Stand-alone server (on top of NSB.Raw)
+- Redirect incoming Subcribe Requests to the configured Topic Exchange
 
 ## Crazy future ideas
 
