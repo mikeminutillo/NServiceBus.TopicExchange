@@ -5,6 +5,7 @@ using NServiceBus;
 using NServiceBus.Extensibility;
 using NServiceBus.Features;
 using NServiceBus.Routing;
+using NServiceBus.Transport;
 using NServiceBus.Unicast.Subscriptions;
 using NServiceBus.Unicast.Subscriptions.MessageDrivenSubscriptions;
 
@@ -12,26 +13,21 @@ class SubscribeTopicExchangeToAllEvents : FeatureStartupTask
 {
     private readonly Type[] eventTypes;
     private readonly ISubscriptionStorage storage;
-    private readonly EndpointInstances endpointInstances;
-    private readonly string topicExchangeEndpointName;
-    private readonly Func<EndpointInstance, string> transportAddressTranslation;
+    private readonly TopicExchangeAddressManager addressManager;
 
-    public SubscribeTopicExchangeToAllEvents(string topicExchangeEndpointName, Type[] eventTypes, ISubscriptionStorage storage, EndpointInstances endpointInstances, Func<EndpointInstance, string> transportAddressTranslation)
+    public SubscribeTopicExchangeToAllEvents(Type[] eventTypes, ISubscriptionStorage storage, TopicExchangeAddressManager addressManager)
     {
-        this.topicExchangeEndpointName = topicExchangeEndpointName;
         this.eventTypes = eventTypes;
         this.storage = storage;
-        this.endpointInstances = endpointInstances;
-        this.transportAddressTranslation = transportAddressTranslation;
+        this.addressManager = addressManager;
     }
 
     // TODO: Periodically refresh this as the EndpointInstances get updated
     protected override Task OnStart(IMessageSession session) =>
-        Task.WhenAll( from instance in endpointInstances.FindInstances(topicExchangeEndpointName)
-            let transportAddress = transportAddressTranslation(instance)
+        Task.WhenAll( from subscriber in addressManager.GetAllTopicExchangeSubscribers()
             from eventType in eventTypes                    
             select storage.Subscribe(
-                new Subscriber(transportAddress, topicExchangeEndpointName), 
+                subscriber,
                 new MessageType(eventType), 
                 new ContextBag()
             )

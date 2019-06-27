@@ -22,6 +22,14 @@ internal class TopicExchangeClient : Feature
         var conventions = context.Settings.Get<Conventions>();
         var publishers = context.Settings.Get<Publishers>();
         var endpointInstances = context.Settings.Get<EndpointInstances>();
+        var distributionPolicy = context.Settings.Get<DistributionPolicy>();
+        
+        var topicExchangeAddressManager = new TopicExchangeAddressManager(
+            exchangeEndpointName, 
+            endpointInstances, 
+            i => transportInfrastructure.ToTransportAddress(LogicalAddress.CreateRemoteAddress(i)), 
+            distributionPolicy
+        );
 
         var eventTypes = context.Settings.GetAvailableTypes().Where(conventions.IsEventType).ToArray();
 
@@ -35,12 +43,16 @@ internal class TopicExchangeClient : Feature
 
         // Route a copy of all published events to the TopicExchange
         context.RegisterStartupTask(b => new SubscribeTopicExchangeToAllEvents(
-            exchangeEndpointName, 
             eventTypes, 
             b.Build<ISubscriptionStorage>(),
-            endpointInstances, 
-            i => transportInfrastructure.ToTransportAddress(LogicalAddress.CreateRemoteAddress(i))
+            topicExchangeAddressManager
         ));
+
+        // Forward all incoming Subscribe/Unsubscribe requests from legacy subscribers to the topic exchange
+        context.Pipeline.Replace(
+            "ProcessSubscriptionRequests", 
+            builder => new RerouteIncomingPubSubMessagesToTopicExchange(topicExchangeAddressManager), 
+            "Reroutes incoming Subscribe and Unsubscribe messages to the topic exchange");
     }
 
     public const string TopicExchangeEndpointNameKey = nameof(TopicExchangeEndpointNameKey);
